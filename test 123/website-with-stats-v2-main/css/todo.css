@@ -1,0 +1,17 @@
+#todo-widget {
+  border: 1px solid #ccc;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+#todo-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.todo-done {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
