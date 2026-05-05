@@ -100,7 +100,7 @@ def page_layout(content: str, username: str | None = None):
         {auth_box}
 
         <div style="text-align:center; padding-top:100px;">
-            <h1 style="font-size:48px; margin-bottom:10px;">Welcome to Sutakutu</h1>
+            <h1 style="font-size:48px; margin-bottom:10px;">Welcome to ToDo-Master</h1>
             {content}
         </div>
 
