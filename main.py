@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Form, Request 
+from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 import secrets
 import time
@@ -53,11 +53,14 @@ def get_user_todos(username: str):
     return [t for t in todos if t["username"] == username]
 
 
+def category_name(cat_id: int):
+    return "Work" if cat_id == 1 else "Home"
+
+
 # -----------------------------
 # PAGE LAYOUT
 # -----------------------------
 def page_layout(content: str, username: str | None = None):
-    # Top-right login or username display
     if username:
         auth_box = f"""
         <div style='position:absolute; top:20px; right:20px;'>
@@ -79,7 +82,6 @@ def page_layout(content: str, username: str | None = None):
         </div>
         """
 
-    # Hide create account if user already created one
     if username in account_created:
         create_section = ""
     else:
@@ -118,7 +120,6 @@ def home(request: Request):
     user = get_current_user(request)
 
     if user:
-        # Show link to ToDo when logged in
         content = """
         <p>Your personalized homepage.</p>
         <p><a href="/todo">Öppna ToDo</a></p>
@@ -137,7 +138,6 @@ def create_account(new_username: str = Form(...), new_password: str = Form(...))
     users[new_username] = new_password
     account_created.add(new_username)
 
-    # Auto-login after account creation
     session_id = create_session(new_username, remember=True)
     response = RedirectResponse("/", status_code=302)
     response.set_cookie("session_id", session_id, httponly=True, max_age=60 * 60 * 24 * 30)
@@ -190,10 +190,12 @@ def todo_page(request: Request):
     for t in user_todos:
         done_style = "text-decoration: line-through;" if t["done"] else ""
         toggle_label = "Ångra" if t["done"] else "Klar"
+        cat = category_name(t["category_id"])
 
         todo_items += f"""
         <li style="margin:5px 0;">
             <span style="{done_style} margin-right:10px;">{t['text']}</span>
+            <span style="color:gray; margin-right:10px;">[{cat}]</span>
             <a href="/todo/toggle/{t['id']}" style="margin-right:10px;">{toggle_label}</a>
             <a href="/todo/delete/{t['id']}" style="color:red;">Radera</a>
         </li>
@@ -270,4 +272,3 @@ def todo_delete(request: Request, todo_id: int):
     todos = [t for t in todos if not (t["id"] == todo_id and t["username"] == user)]
 
     return RedirectResponse("/todo", status_code=302)
-
