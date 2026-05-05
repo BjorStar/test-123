@@ -5,12 +5,19 @@ import time
 
 app = FastAPI()
 
-# In-memory user storage
-users = {}  # {"username": "password"}
-account_created = set()  # users who already created an account
+# -----------------------------
+# IN-MEMORY USER & SESSION DATA
+# -----------------------------
+users = {}              # {"username": "password"}
+account_created = set() # users who already created an account
 
-# In-memory session storage
-sessions = {}  # session_id -> {"username": ..., "expires": ...}
+sessions = {}           # session_id -> {"username": ..., "expires": ...}
+
+# -----------------------------
+# IN-MEMORY TODO DATA
+# -----------------------------
+todos = []              # list of {"id", "username", "text", "category_id", "done"}
+todo_id_counter = 1
 
 
 # -----------------------------
@@ -37,6 +44,13 @@ def get_current_user(request: Request):
         return None
 
     return session["username"]
+
+
+# -----------------------------
+# TODO HELPERS
+# -----------------------------
+def get_user_todos(username: str):
+    return [t for t in todos if t["username"] == username]
 
 
 # -----------------------------
@@ -97,12 +111,22 @@ def page_layout(content: str, username: str | None = None):
 
 
 # -----------------------------
-# ROUTES
+# ROUTES: HOME & AUTH
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     user = get_current_user(request)
-    return page_layout("<p>Your personalized homepage.</p>", username=user)
+
+    if user:
+        # Show link to ToDo when logged in
+        content = """
+        <p>Your personalized homepage.</p>
+        <p><a href="/todo">Öppna ToDo</a></p>
+        """
+    else:
+        content = "<p>Your personalized homepage.</p>"
+
+    return page_layout(content, username=user)
 
 
 @app.post("/create", response_class=HTMLResponse)
@@ -149,3 +173,101 @@ def logout(request: Request):
     response = RedirectResponse("/", status_code=302)
     response.delete_cookie("session_id")
     return response
+
+
+# -----------------------------
+# ROUTES: TODO
+# -----------------------------
+@app.get("/todo", response_class=HTMLResponse)
+def todo_page(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+
+    user_todos = get_user_todos(user)
+
+    todo_items = ""
+    for t in user_todos:
+        done_style = "text-decoration: line-through;" if t["done"] else ""
+        toggle_label = "Ångra" if t["done"] else "Klar"
+
+        todo_items += f"""
+        <li style="margin:5px 0;">
+            <span style="{done_style} margin-right:10px;">{t['text']}</span>
+            <a href="/todo/toggle/{t['id']}" style="margin-right:10px;">{toggle_label}</a>
+            <a href="/todo/delete/{t['id']}" style="color:red;">Radera</a>
+        </li>
+        """
+
+    content = f"""
+    <h2>ToDo</h2>
+
+    <form action="/todo/add" method="post" style="margin-bottom:20px;">
+        <input name="text" placeholder="Ny ToDo..." required style="padding:5px; width:200px;">
+        <select name="category_id" style="padding:5px;">
+            <option value="1">Work</option>
+            <option value="2">Home</option>
+        </select>
+        <button type="submit" style="padding:5px;">Lägg till</button>
+    </form>
+
+    <ul style="list-style:none; padding:0;">
+        {todo_items}
+    </ul>
+
+    <p style="margin-top:20px;">
+        <a href="/">Tillbaka till startsidan</a>
+    </p>
+    """
+
+    return page_layout(content, username=user)
+
+
+@app.post("/todo/add")
+def todo_add(
+    request: Request,
+    text: str = Form(...),
+    category_id: int = Form(...)
+):
+    global todo_id_counter
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+
+    todos.append({
+        "id": todo_id_counter,
+        "username": user,
+        "text": text,
+        "category_id": category_id,
+        "done": False
+    })
+    todo_id_counter += 1
+
+    return RedirectResponse("/todo", status_code=302)
+
+
+@app.get("/todo/toggle/{todo_id}")
+def todo_toggle(request: Request, todo_id: int):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+
+    for t in todos:
+        if t["id"] == todo_id and t["username"] == user:
+            t["done"] = not t["done"]
+            break
+
+    return RedirectResponse("/todo", status_code=302)
+
+
+@app.get("/todo/delete/{todo_id}")
+def todo_delete(request: Request, todo_id: int):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+
+    global todos
+    todos = [t for t in todos if not (t["id"] == todo_id and t["username"] == user)]
+
+    return RedirectResponse("/todo", status_code=302)
+
